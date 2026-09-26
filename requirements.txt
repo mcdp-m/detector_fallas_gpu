@@ -1,2 +1,4 @@
 pandas==3.0.6
 pandera==0.33.1
+scikit-learn==1.9.1
+joblib==1.6.0

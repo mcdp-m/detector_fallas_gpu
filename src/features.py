@@ -29,13 +29,16 @@ def ventanear(df: pd.DataFrame, tam: int = TAM_VENTANA) -> pd.DataFrame:
     """Episodios de telemetría -> tabla de features por ventana con etiqueta.
 
     Una ventana nunca mezcla episodios distintos. Las ventanas no se solapan.
+    Incluye episodio_id solo para poder hacer el split train/test por episodio;
+    se descarta antes de entrenar, nunca es feature.
     """
     filas = []
-    for _, episodio in df.groupby("episodio_id"):
+    for episodio_id, episodio in df.groupby("episodio_id"):
         episodio = episodio.sort_values("segundo")
         for inicio in range(0, len(episodio) - tam + 1, tam):
             ventana = episodio.iloc[inicio : inicio + tam]
             features = calcular_features(ventana)
+            features["episodio_id"] = episodio_id
             features["estado"] = episodio["estado"].iloc[0]
             filas.append(features)
     return pd.DataFrame(filas)
