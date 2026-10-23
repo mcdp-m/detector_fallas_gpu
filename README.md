@@ -25,15 +25,49 @@ Respuesta:
 
 Petición inválida (campos faltantes, tipos o rangos físicos incorrectos, menos de 10 lecturas): 422 sin tocar el modelo.
 
+Cada respuesta incluye la cabecera `X-Latencia-ms`.
+
+| Endpoint | Respuesta |
+|---|---|
+| `GET /health` | `{"status": "ok", "modelo_version": "1.0.0"}` |
+| `GET /metrics` | peticiones, errores, tasa de error y latencia p50/p95/media de `/predecir` desde el último arranque |
+
+## Observabilidad
+
+La API escribe logs JSON por stdout, una línea por evento:
+
+| Nivel | Evento | Cuándo |
+|---|---|---|
+| INFO | `servicio_iniciado` | al cargar el modelo |
+| INFO | `prediccion` | cada predicción (estado, confianza, latencia del modelo, versión) |
+| WARNING | `latencia_alta` | `/predecir` supera `UMBRAL_LATENCIA_MS` |
+| ERROR | `input_invalido` | 422 (tipo de error y campo; no registra los valores enviados) |
+
+```json
+{"timestamp": "2026-10-23T01:11:27Z", "level": "INFO", "evento": "prediccion", "n_lecturas": 10, "estado": "normal", "confianza": 0.6, "latencia_ms": 44.7, "modelo_version": "1.0.0"}
+```
+
+Variables de entorno:
+
+- `UMBRAL_LATENCIA_MS` (por defecto `500`): latencia a partir de la cual se registra `latencia_alta`.
+
+```bash
+docker run -p 8000:8000 -e UMBRAL_LATENCIA_MS=200 detector-gpu
+```
+
+Las métricas viven en memoria y se reinician con el servicio. En Render, los logs se consultan en la pestaña Logs y el health check se configura con la ruta `/health`.
+
 ## Estructura
 
 ```
 src/
-  config.py     # rutas de datos y modelo
+  config.py     # rutas de datos y modelo, versión del modelo
   schema.py     # contrato de datos (pandera) para el entrenamiento
   features.py   # ventaneo y cálculo de features (usado por train.py y api.py)
   train.py      # entrena y serializa el pipeline
-  api.py        # API FastAPI (validación con BaseModel + /predecir)
+  api.py        # API FastAPI (validación, /predecir, /health, /metrics)
+  logger.py     # logs JSON por stdout
+  metrics.py    # métricas en memoria (tráfico, errores, p50/p95)
 data/           # telemetría cruda (no va en la imagen)
 models/         # modelo.joblib serializado (sí va en la imagen)
 docs/           # entendimiento de datos y decisiones de features
